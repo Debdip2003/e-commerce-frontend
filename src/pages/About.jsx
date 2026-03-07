@@ -11,7 +11,7 @@ const About = () => {
       </div>
       <div className="my-10 flex flex-col md:flex-row gap-16">
         <img
-          src={assets.about_img}
+          src={assets.about_img} 
           alt="about_img"
           className="w-full md:max-w-[450px]"
         />
