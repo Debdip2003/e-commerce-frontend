@@ -1,12 +1,13 @@
-import { createContext, useEffect, useState } from "react";
+import { createContext, useEffect, useMemo, useState } from "react";
 import { products } from "../assets/frontend_assets/assets";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import PropTypes from "prop-types";
 
 export const ShopContext = createContext();
 
 const ShopContextProvider = (props) => {
-  const currency = "$";
+  const currency = "Rs";
   const delivery_fee = 10;
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -44,14 +45,15 @@ const ShopContextProvider = (props) => {
           if (cartItems[items][item]) {
             totalCount += cartItems[items][item];
           }
-        } catch (error) {}
+        } catch (error) {
+          console.error("Error occurred while updating cart count:", error);
+        }
       }
     }
     return totalCount;
   };
 
   useEffect(()=>{
-  console.log(cartItems)
   },[cartItems])
 
   const updateQuantity = async (itemId, size, quantity) => {
@@ -69,13 +71,15 @@ const ShopContextProvider = (props) => {
           if (cartItems[items][item]) {
             totalAmount += itemInfo.price * cartItems[items][item];
           }
-        } catch (error) {}
+        } catch (error) {
+          console.error("Error occurred while calculating cart amount:", error);
+        }
       }
     }
     return totalAmount;
   };
 
-  const value = {
+  const value = useMemo(() => ({
     products,
     currency,
     delivery_fee,
@@ -89,11 +93,15 @@ const ShopContextProvider = (props) => {
     updateQuantity,
     getCartAmount,
     navigate,
-  };
+  }), [search, showSearch, cartItems, navigate]);
 
   return (
     <ShopContext.Provider value={value}>{props.children}</ShopContext.Provider>
   );
+};
+
+ShopContextProvider.propTypes={
+  children: PropTypes.node.isRequired
 };
 
 export default ShopContextProvider;

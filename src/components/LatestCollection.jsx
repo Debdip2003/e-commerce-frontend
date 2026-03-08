@@ -2,29 +2,40 @@ import React, { useContext, useEffect, useState } from "react";
 import { ShopContext } from "../context/ShopContext";
 import Title from "./Title";
 import ProductItems from "./ProductItems";
+import { toast } from "react-toastify";
+import { getProductsOnSaleOverview } from "../services/productService";
 
 const LatestCollection = () => {
   const { products } = useContext(ShopContext);
   const [latestProducts, setlatestProducts] = useState([]);
 
   useEffect(() => {
-    setlatestProducts(products.slice(0, 10));
+    getproductsonsaleoverview();
   }, [products]);
+
+  const getproductsonsaleoverview = async () => {
+    try {
+      const response = await getProductsOnSaleOverview();
+      setlatestProducts(response.data);
+    } catch (error) {
+      toast.error("Failed to fetch products on sale overview");
+      console.error("Error fetching products on sale overview:", error);
+    }
+  };
 
   return (
     <div className="my-10">
       <div className="text-center py-8 text-3xl">
-        <Title text1={"LATEST"} text2={"COLLECTIONS"} />
+        <Title text1={"PRODUCTS"} text2={"FOR SALE"} />
         <p className="w-3/4 m-auto text-xs sm:text-sm md:text-base text-gray-600">
-          Lorem ipsum dolor sit amet consectetur adipisicing elit. Molestiae in
-          similique minus
+         Grab the best deals on our top products. Enjoy limited-time discounts on high-quality items designed to bring you style, comfort, and great value.
         </p>
       </div>
       {/* Rendering products */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 gap-y-6">
-        {latestProducts.map((item, index) => (
+        {latestProducts.map((item) => (
           <ProductItems
-            key={index}
+            key={item._id}
             id={item._id}
             image={item.image}
             name={item.name}
