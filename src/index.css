@@ -4,6 +4,14 @@
 @tailwind components;
 @tailwind utilities;
 
+*{
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -40,5 +48,49 @@ display:block
   a.active{
     background-color: black;
     color: white;
+  }
+}
+
+/* Carousel Styling */
+.slick-dots {
+  bottom: -40px;
+}
+
+.slick-dots li button:before {
+  font-size: 10px;
+  color: #000;
+}
+
+.slick-dots li.slick-active button:before {
+  color: #000;
+}
+
+.slick-prev:before,
+.slick-next:before {
+  color: #000;
+  font-size: 24px;
+}
+
+.slick-prev {
+  left: -35px;
+  z-index: 1;
+}
+
+.slick-next {
+  right: -35px;
+  z-index: 1;
+}
+
+.slick-slide > div {
+  height: 100%;
+}
+
+@media (max-width: 640px) {
+  .slick-prev {
+    left: -20px;
+  }
+  
+  .slick-next {
+    right: -20px;
   }
 }

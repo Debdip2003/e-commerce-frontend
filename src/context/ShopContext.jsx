@@ -1,8 +1,8 @@
 import { createContext, useEffect, useMemo, useState } from "react";
-import { products } from "../assets/frontend_assets/assets";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
+import { getProducts, searchProducts } from "../services/productService";
 
 export const ShopContext = createContext();
 
@@ -12,7 +12,67 @@ const ShopContextProvider = (props) => {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [cartItems, setCartItems] = useState({});
+  const [products, setProducts] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [filters, setFilters] = useState({});
   const navigate=useNavigate()
+
+  useEffect(()=>{
+    const timer = setTimeout(()=>{
+      if(!search || search.trim().length === 0){
+        fetchProducts();
+        setIsSearching(false);
+        return;
+      }
+      
+      // Only search if 2 or more characters
+      if(search.trim().length >= 2){
+        fetchSearchResults();
+      }
+    }, 500)
+
+    return () => clearTimeout(timer);
+  }, [search])
+
+  
+  useEffect(() => {
+    if (!isSearching && (!search || search.trim().length === 0)) {
+      fetchProducts(filters);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+
+    
+  const fetchSearchResults = async () => {
+        if (showSearch && search && search.trim().length > 0) {
+          setIsSearching(true);
+          try {
+            const response = await searchProducts(search);
+            const data = response.data;
+            if(data){
+              setProducts(data);
+              setIsSearching(false);
+            }
+          } catch (error) {
+            console.error("Error searching products:", error);
+            setProducts([]);
+          }
+     }
+  };
+
+  const fetchProducts = async(filterParams = {}) =>{
+    try{
+      const response = await getProducts(filterParams);
+      const data = response.data;
+      if(data){
+        setProducts(data);
+      } else {
+        console.error("Failed to fetch products");
+      }
+    }catch(error){
+      console.error(error);
+    }
+  }
 
   const addToCart = async (itemId, size) => {
     if (!size) {
@@ -53,9 +113,6 @@ const ShopContextProvider = (props) => {
     return totalCount;
   };
 
-  useEffect(()=>{
-  },[cartItems])
-
   const updateQuantity = async (itemId, size, quantity) => {
     let cartData = structuredClone(cartItems);
     cartData[itemId][size] = quantity;
@@ -87,13 +144,16 @@ const ShopContextProvider = (props) => {
     setSearch,
     showSearch,
     setShowSearch,
+    isSearching,
+    filters,
+    setFilters,
     cartItems,
     addToCart,
     getCartCount,
     updateQuantity,
     getCartAmount,
     navigate,
-  }), [search, showSearch, cartItems, navigate]);
+  }), [products, search, showSearch, cartItems, navigate]);
 
   return (
     <ShopContext.Provider value={value}>{props.children}</ShopContext.Provider>

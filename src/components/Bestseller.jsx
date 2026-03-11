@@ -18,7 +18,6 @@ const Bestseller = () => {
       const response = await getBestSellingProductsOverview();
       setBestSeller(response.data); 
     }catch(error){
-      toast.error("Failed to fetch bestselling products overview");
       console.error("Error fetching bestselling products overview:", error);
     }
   }

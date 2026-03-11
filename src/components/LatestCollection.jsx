@@ -18,7 +18,6 @@ const LatestCollection = () => {
       const response = await getProductsOnSaleOverview();
       setlatestProducts(response.data);
     } catch (error) {
-      toast.error("Failed to fetch products on sale overview");
       console.error("Error fetching products on sale overview:", error);
     }
   };
