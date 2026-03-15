@@ -1,8 +1,8 @@
 import React, { useContext, useEffect, useState } from "react";
 import { ShopContext } from "../context/ShopContext";
 import Title from "../components/Title";
-import { assets } from "../assets/frontend_assets/assets";
 import CartTotal from "../components/CartTotal";
+import binIcon from "../assets/frontend_assets/bin_icon.png"
 
 const Cart = () => {
   const { products, currency, cartItems, updateQuantity, navigate } =
@@ -45,7 +45,7 @@ const Cart = () => {
             >
               <div className="flex items-start gap-6">
                 <img
-                  src={productData.image[0]} // Assuming the first image in the array is used
+                  src={productData.image}
                   alt={productData.name}
                   className="w-16 sm:w-20"
                 />
@@ -80,7 +80,7 @@ const Cart = () => {
                 }
               />
               <img
-                src={assets.bin_icon}
+                src={binIcon}
                 alt="bin_icon"
                 className="w-4 mr-4 sm:w-5 cursor-pointer"
                 onClick={() => updateQuantity(item._id, item.size, 0)}

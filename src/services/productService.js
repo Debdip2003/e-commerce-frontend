@@ -31,6 +31,11 @@ export const searchProducts = (searchTerm) => {
     return api.get(`/products/search?query=${encodeURIComponent(searchTerm)}`);
 }
 
+export const getProductById = (id) => {
+    return api.get(`/products/${id}`);
+}
+
+// for the static filter options in the UI, we can define them here and export for use in components
 export const filterOptions = {
     priceRanges: [
         { label: 'Under ₹500', min: 0, max: 500 },

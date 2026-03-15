@@ -1,9 +1,9 @@
 import React from "react";
 import Title from "../components/Title";
-import { assets } from "../assets/frontend_assets/assets";
 import NewsletterBox from "../components/NewsletterBox";
+import contactPageImg from "../assets/frontend_assets/contact_img.png"
 
-const s = () => {
+const Contact = () => {
   return (
     <div>
       <div className="text-center text-2xl pt-10 border-t">
@@ -11,7 +11,7 @@ const s = () => {
       </div>
       <div className="my-10 flex flex-col justify-center md:flex-row gap-10 mb-28">
         <img
-          src={assets.contact_img}
+          src={contactPageImg}
           alt="contact_image"
           className="w-full md:max-w-[480px]"
         />
@@ -40,4 +40,4 @@ const s = () => {
   );
 };
 
-export default s;
+export default Contact;

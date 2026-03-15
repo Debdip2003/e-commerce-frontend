@@ -18,7 +18,13 @@ import 'react-toastify/dist/ReactToastify.css';
 function App() {
   return (
     <div className='px-4 sm:px-[5vw] md:px-[7vw] lg:px-[9vw]'>
-      <ToastContainer/>
+      <ToastContainer
+      position='bottom-center'
+      autoClose={5000}
+      hideProgressBar={true}
+      newestOnTop={true}
+      closeOnClick
+      />
       <NavBar/>
       <SearchBar/>
     <Routes>

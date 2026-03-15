@@ -3,6 +3,8 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
 import { getProducts, searchProducts } from "../services/productService";
+import api from "../services/axiosInstance";
+import { getUserId } from "../services/userService";
 
 export const ShopContext = createContext();
 
@@ -15,17 +17,19 @@ const ShopContextProvider = (props) => {
   const [products, setProducts] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [filters, setFilters] = useState({});
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    Boolean(localStorage.getItem("access-token"))
+  );
+  const [userId, setUserId] = useState("");
   const navigate=useNavigate()
 
   useEffect(()=>{
     const timer = setTimeout(()=>{
       if(!search || search.trim().length === 0){
-        fetchProducts();
         setIsSearching(false);
         return;
       }
       
-      // Only search if 2 or more characters
       if(search.trim().length >= 2){
         fetchSearchResults();
       }
@@ -42,7 +46,51 @@ const ShopContextProvider = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
-    
+  useEffect(()=>{
+    if(isAuthenticated){
+      fetchUserDetails();
+    }
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const restoreSession = async () => {
+      const accessToken = localStorage.getItem("access-token");
+      const refreshToken = localStorage.getItem("refresh-token");
+
+      if (accessToken || !refreshToken) return;
+
+      try {
+        const response = await api.post("/user/refresh-token", { refreshToken });
+        const newAccessToken = response?.data?.accessToken || response?.data?.token;
+
+        if (!newAccessToken) {
+          throw new Error("No access token returned from refresh endpoint");
+        }
+
+        if (!cancelled) {
+          setAuthToken(newAccessToken, refreshToken);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAuthToken(null);
+        }
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const fetchUserDetails = async () =>{
+    const userId = await getUserId();
+    setUserId(userId);
+  }
+
   const fetchSearchResults = async () => {
         if (showSearch && search && search.trim().length > 0) {
           setIsSearching(true);
@@ -57,7 +105,7 @@ const ShopContextProvider = (props) => {
             console.error("Error searching products:", error);
             setProducts([]);
           }
-     }
+    }
   };
 
   const fetchProducts = async(filterParams = {}) =>{
@@ -73,6 +121,24 @@ const ShopContextProvider = (props) => {
       console.error(error);
     }
   }
+
+  const setAuthToken = (accessToken, refreshToken = "") => {
+    if (accessToken) {
+      localStorage.setItem("access-token", accessToken);
+      if (refreshToken) localStorage.setItem("refresh-token", refreshToken);
+      setIsAuthenticated(true);
+    } else {
+      localStorage.removeItem("access-token");
+      localStorage.removeItem("refresh-token");
+      setIsAuthenticated(false);
+    }
+  };
+
+  useEffect(() => {
+    const syncAuth = () => setIsAuthenticated(Boolean(localStorage.getItem("access-token")));
+    window.addEventListener("storage", syncAuth); // cross-tab sync
+    return () => window.removeEventListener("storage", syncAuth);
+  }, []);
 
   const addToCart = async (itemId, size) => {
     if (!size) {
@@ -153,7 +219,19 @@ const ShopContextProvider = (props) => {
     updateQuantity,
     getCartAmount,
     navigate,
-  }), [products, search, showSearch, cartItems, navigate]);
+    isAuthenticated,
+    setAuthToken,
+    userId,
+  }), [
+    products,
+    search,
+    showSearch,
+    isSearching,
+    filters,
+    cartItems,
+    navigate,
+    isAuthenticated,
+  ]);
 
   return (
     <ShopContext.Provider value={value}>{props.children}</ShopContext.Provider>

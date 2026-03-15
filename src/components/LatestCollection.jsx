@@ -2,7 +2,6 @@ import React, { useContext, useEffect, useState } from "react";
 import { ShopContext } from "../context/ShopContext";
 import Title from "./Title";
 import ProductItems from "./ProductItems";
-import { toast } from "react-toastify";
 import { getProductsOnSaleOverview } from "../services/productService";
 
 const LatestCollection = () => {
@@ -27,7 +26,7 @@ const LatestCollection = () => {
       <div className="text-center py-8 text-3xl">
         <Title text1={"PRODUCTS"} text2={"FOR SALE"} />
         <p className="w-3/4 m-auto text-xs sm:text-sm md:text-base text-gray-600">
-         Grab the best deals on our top products. Enjoy limited-time discounts on high-quality items designed to bring you style, comfort, and great value.
+        Grab the best deals on our top products. Enjoy limited-time discounts on high-quality items designed to bring you style, comfort, and great value.
         </p>
       </div>
       {/* Rendering products */}
@@ -39,6 +38,8 @@ const LatestCollection = () => {
             image={item.image}
             name={item.name}
             price={item.price}
+            olderPrice={item.olderPrice}
+            discountPercent={item.discountPercent}
           />
         ))}
       </div>

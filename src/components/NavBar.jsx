@@ -1,17 +1,70 @@
 import React, { useContext, useState } from "react";
-import { assets } from "..//assets/frontend_assets/assets";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import { ShopContext } from "../context/ShopContext";
+import logo from "../assets/frontend_assets/logo.png"
+import searchIcon from "../assets/frontend_assets/search_icon.png"
+import profileIcon from "../assets/frontend_assets/profile_icon.png"
+import cartIcon from "../assets/frontend_assets/cart_icon.png"
+import menuIcon from "../assets/frontend_assets/menu_icon.png"
+import dropdownIcon from "../assets/frontend_assets/dropdown_icon.png"
+import { deleteUserAccount, logoutUser } from "../services/userService";
 
 const NavBar = () => {
+  const { isAuthenticated, setAuthToken } = useContext(ShopContext);
   const [visible, setVisible] = useState(false);
   const { setShowSearch, getCartCount } = useContext(ShopContext);
+  const navigate = useNavigate();
+
+  const logoutHandler = async () => {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const data = await logoutUser();
+      if (data?.error) {
+        setAuthToken(null);
+        toast.error(data.error || "Logout failed");
+        return;
+      }
+      setAuthToken(null);
+      toast.success(data?.message || "Logout successful");
+      navigate("/");
+    } catch (error) {
+      setAuthToken(null);
+      toast.error(error?.response?.data?.error || "Logout failed");
+    }
+  };
+
+  const deleteUserHandler = async() =>{
+    if(!isAuthenticated){
+      navigate("/login");
+      return;
+    }
+
+    try{
+      const data = await deleteUserAccount();
+      if(data?.error){
+        toast.error(data.error || "Account deletion failed");
+        return;
+      }
+      toast.success(data?.message || "Account deleted successfully");
+      setAuthToken(null);
+      navigate("/");
+    } catch (error) {
+      toast.error(error?.response?.data?.error || "Account deletion failed");
+
+    }
+
+  }
 
   return (
     <div className="flex items-center justify-between py-5 font-medium">
       <Link to={"/"}>
         {" "}
-        <img src={assets.logo} alt="logo" className="w-36" />
+        <img src={logo} alt="logo" className="w-36" />
       </Link>
       <ul className="hidden sm:flex gap-5 text-sm text-gray-700">
         <NavLink className="flex flex-col items-center gap-1" to="/">
@@ -34,34 +87,44 @@ const NavBar = () => {
 
       <div className="flex items-center gap-6">
         <img
-          src={assets.search_icon}
+          src={searchIcon}
           alt="search_icon"
           className="w-5 cursor-pointer"
           onClick={() => setShowSearch(true)}
         />
         <div className="group relative">
-       <Link to={'/login'}>   <img
-            src={assets.profile_icon}
+      <Link>
+        <img
+            src={profileIcon}
             className="w-5 cursor-pointer"
             alt="profile_icon"
           /></Link>
-          <div className="group-hover:block hidden absolute dropdown-menu right-0 pt-4">
-            <div className="flex flex-col gap-2 w-36 py-3 px-5 bg-slate-100 text-gray-500 rounded">
-              <p className="cursor-pointer hover:text-black">My Profile</p>
-              <p className="cursor-pointer hover:text-black">Orders</p>
-              <p className="cursor-pointer hover:text-black">Logout</p>
+          <div className="group-hover:block hidden absolute dropdown-menu right-0 pt-4 z-50">
+            <div className="flex flex-col w-44 bg-white border border-gray-200 rounded text-sm text-gray-700 overflow-hidden">
+              {isAuthenticated ? (
+                <>
+                  <p className="px-4 py-2 cursor-pointer" onClick={() => navigate("/orders")}>Orders</p>
+                  <p className="px-4 py-2 cursor-pointer" onClick={() => navigate("/profile")}>My Profile</p>
+                  <p className="px-4 py-2.5 border-b border-gray-100 font-medium text-gray-900 cursor-default select-none" onClick={() => deleteUserHandler()}>Delete Account</p>
+                  <p className="px-4 py-2 cursor-pointer text-red-500" onClick={logoutHandler}>Logout</p>
+                </>
+              ) : (
+                <>
+                  <p className="px-4 py-2 cursor-pointer" onClick={() => navigate("/login")}>Sign Up</p>
+                </>
+              )}
             </div>
           </div>
         </div>
         <Link to="/cart" className="relative">
-          <img src={assets.cart_icon} className="w-5 min-w-5" alt="cart_icon" />
+          <img src={cartIcon} className="w-5 min-w-5" alt="cart_icon" />
           <p className="absolute right-[-5px] bottom-[-5px] w-4 text-center leading-4 bg-black text-white aspect-square rounded-full text-[8px]">
             {getCartCount()}
           </p>
         </Link>
 
         <img
-          src={assets.menu_icon}
+          src={menuIcon}
           className="w-5 cursor-pointer sm:hidden"
           alt="menu_icon"
           onClick={() => setVisible(true)}
@@ -80,7 +143,7 @@ const NavBar = () => {
             onClick={() => setVisible(false)}
           >
             <img
-              src={assets.dropdown_icon}
+              src={dropdownIcon}
               className="h-4 rotate-180"
               alt="dropdown_menu"
             />
@@ -121,6 +184,3 @@ const NavBar = () => {
 };
 
 export default NavBar;
-
-//when we open up the console , we will see a "active" class on the specific route that we have selected in the Navbar
-//specific feature of the NavLink tag hidden

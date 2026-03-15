@@ -1,8 +1,9 @@
 import React, { useContext, useState } from "react";
 import Title from "../components/Title";
 import CartTotal from "../components/CartTotal";
-import { assets } from "../assets/frontend_assets/assets";
 import { ShopContext } from "../context/ShopContext";
+import stripeLogo from "../assets/frontend_assets/stripe_logo.png"
+import razorpayLogo from "../assets/frontend_assets/razorpay_logo.png"
 
 const PlaceOrder = () => {
   const [method, setMethod] = useState("cod");
@@ -86,7 +87,7 @@ const PlaceOrder = () => {
                 }`}
               ></p>
               <img
-                src={assets.stripe_logo}
+                src={stripeLogo}
                 alt="stripe_logo"
                 className="h-5 mx-4"
               />
@@ -101,7 +102,7 @@ const PlaceOrder = () => {
                 }`}
               ></p>
               <img
-                src={assets.razorpay_logo}
+                src={razorpayLogo}
                 alt="razorpay_logo"
                 className="h-5 mx-4"
               />
