@@ -5,25 +5,9 @@ import CartTotal from "../components/CartTotal";
 import binIcon from "../assets/frontend_assets/bin_icon.png"
 
 const Cart = () => {
-  const { products, currency, cartItems, updateQuantity, navigate } =
+  const { products, currency, cartItems, updateQuantity, navigate, userId } =
     useContext(ShopContext);
   const [cartData, setCartData] = useState([]);
-
-  useEffect(() => {
-    const tempData = [];
-    for (const items in cartItems) {
-      for (const item in cartItems[items]) {
-        if (cartItems[items][item] > 0) {
-          tempData.push({
-            _id: items,
-            size: item,
-            quantity: cartItems[items][item],
-          });
-        }
-      }
-    }
-    setCartData(tempData);
-  }, [cartItems]);
 
   return (
     <div className="border-t pt-14">

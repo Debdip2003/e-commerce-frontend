@@ -5,6 +5,7 @@ import PropTypes from "prop-types";
 import { getProducts, searchProducts } from "../services/productService";
 import api from "../services/axiosInstance";
 import { getUserId } from "../services/userService";
+import { addCartItem, getCartItems } from "../services/cartService";
 
 export const ShopContext = createContext();
 
@@ -38,7 +39,6 @@ const ShopContextProvider = (props) => {
     return () => clearTimeout(timer);
   }, [search])
 
-  
   useEffect(() => {
     if (!isSearching && (!search || search.trim().length === 0)) {
       fetchProducts(filters);
@@ -85,6 +85,18 @@ const ShopContextProvider = (props) => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const syncAuth = () => setIsAuthenticated(Boolean(localStorage.getItem("access-token")));
+    window.addEventListener("storage", syncAuth); // cross-tab sync
+    return () => window.removeEventListener("storage", syncAuth);
+  }, []);
+
+  useEffect(()=>{
+    if(userId){
+      fetchCartItems(userId);
+    }
+  },[userId])
 
   const fetchUserDetails = async () =>{
     const userId = await getUserId();
@@ -134,34 +146,28 @@ const ShopContextProvider = (props) => {
     }
   };
 
-  useEffect(() => {
-    const syncAuth = () => setIsAuthenticated(Boolean(localStorage.getItem("access-token")));
-    window.addEventListener("storage", syncAuth); // cross-tab sync
-    return () => window.removeEventListener("storage", syncAuth);
-  }, []);
-
   const addToCart = async (itemId, size) => {
     if (!size) {
       toast.error("Select Product Size");
       return;
     }else{
-      toast.success("Product is added to cart");
+        const response = await addCartItem(itemId, size, 1);
+        if(response.status === 200){
+          toast.success(response.data.message || "Product is added to cart");
+        }else{
+          toast.error(response.data.message || "Failed to add item to cart");
+        }
     }
-
-    let cartData = structuredClone(cartItems);
-
-    if (cartData[itemId]) {
-      if (cartData[itemId][size]) {
-        cartData[itemId][size] += 1;
-      } else {
-        cartData[itemId][size] = 1;
-      }
-    } else {
-      cartData[itemId] = {};
-      cartData[itemId][size] = 1;
-    }
-    setCartItems(cartData);
   };
+
+  const fetchCartItems = async (userId) =>{
+      const response = await getCartItems(userId);
+      if(response.status === 200){
+        setCartItems(response.data || {});
+      }else{
+        toast.error(response.data.message || "Failed to fetch cart items");
+      }
+  }
 
   const getCartCount = () => {
     let totalCount = 0;
