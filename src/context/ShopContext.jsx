@@ -5,7 +5,7 @@ import PropTypes from "prop-types";
 import { getProducts, searchProducts } from "../services/productService";
 import api from "../services/axiosInstance";
 import { getUserId } from "../services/userService";
-import { addCartItem, getCartItems } from "../services/cartService";
+import { addCartItem, getCartItems, updateCartItem, deleteCartItem } from "../services/cartService";
 
 export const ShopContext = createContext();
 
@@ -22,6 +22,7 @@ const ShopContextProvider = (props) => {
     Boolean(localStorage.getItem("access-token"))
   );
   const [userId, setUserId] = useState("");
+  const [cartTotal, setCartTotal] = useState(0);
   const navigate=useNavigate()
 
   useEffect(()=>{
@@ -98,6 +99,8 @@ const ShopContextProvider = (props) => {
     }
   },[userId])
 
+
+
   const fetchUserDetails = async () =>{
     const userId = await getUserId();
     setUserId(userId);
@@ -151,62 +154,96 @@ const ShopContextProvider = (props) => {
       toast.error("Select Product Size");
       return;
     }else{
-        const response = await addCartItem(itemId, size, 1);
-        if(response.status === 200){
-          toast.success(response.data.message || "Product is added to cart");
-        }else{
-          toast.error(response.data.message || "Failed to add item to cart");
+        try {
+          const response = await addCartItem(itemId, size, 1);
+          if(response.status === 200){
+            // Update cart items and total from response
+            setCartItems(response.data.cart || {});
+            setCartTotal(response.data.total || 0);
+            toast.success(response.data.message || "Product is added to cart");
+            // Fetch latest cart details from backend
+            if(userId) {
+              await fetchCartItems(userId);
+            }
+          }else{
+            toast.error(response.data.message || "Failed to add item to cart");
+          }
+        } catch (error) {
+          console.error("Error adding to cart:", error);
+          toast.error("Failed to add item to cart");
         }
     }
   };
 
   const fetchCartItems = async (userId) =>{
-      const response = await getCartItems(userId);
-      if(response.status === 200){
-        setCartItems(response.data || {});
-      }else{
-        toast.error(response.data.message || "Failed to fetch cart items");
+      try {
+        const response = await getCartItems(userId);
+        if(response.status === 200){
+          setCartItems(response.data.cart || response.data || {});
+          setCartTotal(response.data.total || 0);
+        }else{
+          toast.error(response.data.message || "Failed to fetch cart items");
+        }
+      } catch (error) {
+        console.error("Error fetching cart items:", error);
+        toast.error("Failed to fetch cart items");
       }
   }
 
   const getCartCount = () => {
     let totalCount = 0;
-    for (const items in cartItems) {
-      for (const item in cartItems[items]) {
-        try {
-          if (cartItems[items][item]) {
-            totalCount += cartItems[items][item];
+    for (const productId in cartItems) {
+      const items = cartItems[productId];
+      if (Array.isArray(items)) {
+        items.forEach((item) => {
+          if (item && item.quantity) {
+            totalCount += item.quantity;
           }
-        } catch (error) {
-          console.error("Error occurred while updating cart count:", error);
-        }
+        });
       }
     }
     return totalCount;
   };
 
   const updateQuantity = async (itemId, size, quantity) => {
-    let cartData = structuredClone(cartItems);
-    cartData[itemId][size] = quantity;
-    setCartItems(cartData);
-  };
-
-  const getCartAmount = () => {
-    let totalAmount = 0;
-    for (const items in cartItems) {
-      let itemInfo = products.find((products) => products._id === items);
-      for (const item in cartItems[items]) {
-        try {
-          if (cartItems[items][item]) {
-            totalAmount += itemInfo.price * cartItems[items][item];
+    try {
+      if (quantity > 0) {
+        // Update quantity via API
+        const response = await updateCartItem(itemId, size, quantity);
+        if (response.status === 200) {
+          // Update local state with the updated cart and total from API
+          setCartItems(response.data.cart || {});
+          setCartTotal(response.data.total || 0);
+          toast.success("Cart updated successfully");
+          // Fetch latest cart details from backend
+          if(userId) {
+            await fetchCartItems(userId);
           }
-        } catch (error) {
-          console.error("Error occurred while calculating cart amount:", error);
+        }
+      } else {
+        // For deletion (quantity = 0), call delete API
+        const response = await deleteCartItem(itemId);
+        if (response.status === 200) {
+          setCartItems(response.data.cart || {});
+          setCartTotal(response.data.total || 0);
+          toast.success(response.data.message || "Item removed from cart");
+          // Fetch latest cart details from backend
+          if(userId) {
+            await fetchCartItems(userId);
+          }
         }
       }
+    } catch (error) {
+      console.error("Error updating cart:", error);
+      toast.error(error.response?.data?.error || "Failed to update cart");
+      // Revert to previous state by refetching cart
+      if (userId) {
+        fetchCartItems(userId);
+      }
     }
-    return totalAmount;
   };
+
+
 
   const value = useMemo(() => ({
     products,
@@ -223,11 +260,11 @@ const ShopContextProvider = (props) => {
     addToCart,
     getCartCount,
     updateQuantity,
-    getCartAmount,
     navigate,
     isAuthenticated,
     setAuthToken,
     userId,
+    cartTotal,
   }), [
     products,
     search,
@@ -237,6 +274,7 @@ const ShopContextProvider = (props) => {
     cartItems,
     navigate,
     isAuthenticated,
+    cartTotal,
   ]);
 
   return (

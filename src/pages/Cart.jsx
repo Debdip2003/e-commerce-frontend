@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext } from "react";
 import { ShopContext } from "../context/ShopContext";
 import Title from "../components/Title";
 import CartTotal from "../components/CartTotal";
@@ -7,7 +7,6 @@ import binIcon from "../assets/frontend_assets/bin_icon.png"
 const Cart = () => {
   const { products, currency, cartItems, updateQuantity, navigate, userId } =
     useContext(ShopContext);
-  const [cartData, setCartData] = useState([]);
 
   return (
     <div className="border-t pt-14">
@@ -15,16 +14,16 @@ const Cart = () => {
         <Title text1={"YOUR"} text2={"CART"} />
       </div>
       <div>
-        {cartData.map((item, index) => {
+        {Object.entries(cartItems).map(([productId, items]) => {
           const productData = products.find(
-            (product) => product._id === item._id
+            (product) => product._id === productId
           );
 
           if (!productData) return null;
 
-          return (
+          return items.map((item, index) => (
             <div
-              key={index}
+              key={`${productId}-${index}`}
               className="py-4 border-t border-b text-gray-700 grid grid-cols-[4fr_0.5fr_0.5fr] sm:grid-cols-[4fr_2fr_0.5fr] items-center gap-4"
             >
               <div className="flex items-start gap-6">
@@ -51,13 +50,13 @@ const Cart = () => {
               <input
                 type="number"
                 min={1}
-                defaultValue={item.quantity}
+                value={item.quantity}
                 className="border max-w-10 sm:max-w-20 px-1 sm:px-2 py-1"
                 onChange={(e) =>
                   e.target.value === "" || e.target.value === "0"
                     ? null
                     : updateQuantity(
-                        item._id,
+                        productId,
                         item.size,
                         Number(e.target.value)
                       )
@@ -67,10 +66,10 @@ const Cart = () => {
                 src={binIcon}
                 alt="bin_icon"
                 className="w-4 mr-4 sm:w-5 cursor-pointer"
-                onClick={() => updateQuantity(item._id, item.size, 0)}
+                onClick={() => updateQuantity(productId, item.size, 0)}
               />
             </div>
-          );
+          ));
         })}
       </div>
       <div className="flex justify-end my-20">
