@@ -77,8 +77,13 @@ const Cart = () => {
           <CartTotal />
           <div className="w-full text-end">
             <button
-              className="bg-black text-white text-sm my-8 px-8 py-3"
+              className={`text-white text-sm my-8 px-8 py-3 ${
+                Object.entries(cartItems).length === 0
+                  ? "bg-gray-400 cursor-not-allowed opacity-50"
+                  : "bg-black cursor-pointer"
+              }`}
               onClick={() => navigate("/placeorder")}
+              disabled={Object.entries(cartItems).length === 0}
             >
               PROCEED TO CHECKOUT
             </button>

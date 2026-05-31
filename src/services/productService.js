@@ -28,7 +28,7 @@ export const getProducts = (filters = {}) => {
 }
 
 export const searchProducts = (searchTerm) => {
-    return api.get(`/products/search?query=${encodeURIComponent(searchTerm)}`);
+    return api.post("/products/ai-search", { query: searchTerm });
 }
 
 export const getProductById = (id) => {

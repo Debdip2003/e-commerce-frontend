@@ -1,13 +1,172 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import Title from "../components/Title";
 import CartTotal from "../components/CartTotal";
 import { ShopContext } from "../context/ShopContext";
-import stripeLogo from "../assets/frontend_assets/stripe_logo.png"
-import razorpayLogo from "../assets/frontend_assets/razorpay_logo.png"
+import { getUserProfile, getUserById } from "../services/userService";
 
 const PlaceOrder = () => {
-  const [method, setMethod] = useState("cod");
-  const { navigate } = useContext(ShopContext);
+  const [method, setMethod] = useState("CashOnDelivery");
+  const { navigate, submitOrder, cartTotal, delivery_fee, cartItems } = useContext(ShopContext);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isProfileComplete, setIsProfileComplete] = useState(false);
+  const [useDifferentAddress, setUseDifferentAddress] = useState(false);
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    street: "",
+    city: "",
+    state: "",
+    zipcode: "",
+    country: "",
+    phoneNumber: ""
+  });
+
+  // Track which fields were pre-filled from profile
+  const [prefilled, setPrefilled] = useState({});
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        // Step 1: Get user ID from profile endpoint
+        const userId = await getUserProfile();
+        
+        if (!userId) {
+          toast.error("Unable to identify user");
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        // Step 2: Use the user ID to fetch full user details
+        const fullUserDetails = await getUserById(userId);
+        
+        // Handle name splitting if only name field is present
+        let firstName = fullUserDetails.firstName || "";
+        let lastName = fullUserDetails.lastName || "";
+        
+        if (!firstName && !lastName && fullUserDetails.name) {
+          // Split the name into firstName and lastName
+          const nameParts = fullUserDetails.name.trim().split(" ");
+          firstName = nameParts[0] || "";
+          lastName = nameParts.slice(1).join(" ") || "";
+        }
+        
+        // Pre-fill available user data from full user details
+        const userData = {
+          firstName: firstName,
+          lastName: lastName,
+          email: fullUserDetails.email || "",
+          street: fullUserDetails.address?.street || "",
+          city: fullUserDetails.address?.city || "",
+          state: fullUserDetails.address?.state || "",
+          zipcode: fullUserDetails.address?.zipcode || "",
+          country: fullUserDetails.address?.country || "",
+          phoneNumber: fullUserDetails.phoneNumber || ""
+        };
+
+        setFormData(userData);
+        
+        // Check if profile is complete (all required fields filled)
+        const isComplete = 
+          firstName && 
+          lastName && 
+          fullUserDetails.email && 
+          fullUserDetails.phoneNumber &&
+          fullUserDetails.address?.street &&
+          fullUserDetails.address?.city &&
+          fullUserDetails.address?.state &&
+          fullUserDetails.address?.zipcode &&
+          fullUserDetails.address?.country;
+        
+        setIsProfileComplete(isComplete);
+        
+        // Mark which fields were pre-filled
+        const prefilledFields = {};
+        if (isComplete) {
+          // If profile is complete, disable all address-related fields
+          prefilledFields.firstName = true;
+          prefilledFields.lastName = true;
+          prefilledFields.email = true;
+          prefilledFields.street = true;
+          prefilledFields.city = true;
+          prefilledFields.state = true;
+          prefilledFields.zipcode = true;
+          prefilledFields.country = true;
+          prefilledFields.phoneNumber = true;
+        } else {
+          // If profile is incomplete, only disable the fields that have values
+          Object.keys(userData).forEach(key => {
+            if (userData[key]) {
+              prefilledFields[key] = true;
+            }
+          });
+        }
+        setPrefilled(prefilledFields);
+      } catch (error) {
+        toast.error("Failed to load user profile");
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    loadUserProfile();
+  }, []);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handlePlaceOrder = async (e) => {
+    e.preventDefault();
+    
+    // Validate all fields
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.street || 
+        !formData.city || !formData.state || !formData.zipcode || !formData.country || !formData.phoneNumber) {
+      toast.error("Please fill all delivery information fields");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      
+      const orderData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        street: formData.street,
+        city: formData.city,
+        state: formData.state,
+        zipcode: formData.zipcode,
+        country: formData.country,
+        phoneNumber: formData.phoneNumber,
+        cart: cartItems,
+        totalPrice: cartTotal === 0 ? 0 : cartTotal + delivery_fee,
+        paymentMethod: method
+      };
+
+      await submitOrder(orderData);
+    } catch (error) {
+      toast.error("Failed to place order");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoadingProfile) {
+    return (
+      <div className="border-t pt-14 min-h-[80vh] flex justify-center items-center">
+        <p className="text-gray-500 text-lg">Loading your information...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col sm:flex-row justify-between gap-4 pt-5 sm:pt-14 min-h-[80vh] border-t">
@@ -16,56 +175,115 @@ const PlaceOrder = () => {
         <div className="text-xl sm:text-2xl my-3">
           <Title text1={"DELIVERY"} text2={"INFORMATION"} />
         </div>
+        {isProfileComplete ? (
+          <div className="bg-green-50 border border-green-200 rounded p-3 mb-2">
+            <p className="text-xs text-green-700">
+              ✓ Your profile is complete. Address fields are locked to your saved address. To change your address, please update your <span className="font-semibold cursor-pointer hover:underline" onClick={() => navigate("/profile")}>profile</span>.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-2">
+            <p className="text-xs text-yellow-700">
+              Your profile is incomplete. Please fill in the missing fields below. <span className="font-semibold cursor-pointer hover:underline" onClick={() => navigate("/profile")}>Complete your profile</span> to auto-fill delivery address on future orders.
+            </p>
+          </div>
+        )}
+        
+        {isProfileComplete && (
+          <button
+            type="button"
+            onClick={() => setUseDifferentAddress(!useDifferentAddress)}
+            className="text-xs text-blue-600 hover:text-blue-800 underline mb-3 text-left"
+          >
+            {useDifferentAddress ? "Use Saved Address" : "Use Different Address"}
+          </button>
+        )}
         <div className="flex gap-3">
           <input
             type="text"
+            name="firstName"
             placeholder="First name"
-            className="border border-gray-300 rounded py-1.5 px-3.5 w-full"
+            value={formData.firstName}
+            onChange={handleInputChange}
+            disabled={prefilled.firstName}
+            className={`border border-gray-300 rounded py-1.5 px-3.5 w-full ${prefilled.firstName ? 'bg-gray-100 text-gray-800 cursor-not-allowed' : 'bg-white'}`}
           ></input>
           <input
             type="text"
+            name="lastName"
             placeholder="Last name"
-            className="border border-gray-300 rounded py-1.5 px-3.5 w-full"
+            value={formData.lastName}
+            onChange={handleInputChange}
+            disabled={prefilled.lastName}
+            className={`border border-gray-300 rounded py-1.5 px-3.5 w-full ${prefilled.lastName ? 'bg-gray-100 text-gray-800 cursor-not-allowed' : 'bg-white'}`}
           ></input>
         </div>
         <input
           type="email"
+          name="email"
           placeholder="Email address"
-          className="border border-gray-300 rounded py-1.5 px-3.5 w-full"
+          value={formData.email}
+          onChange={handleInputChange}
+          disabled={prefilled.email}
+          className={`border border-gray-300 rounded py-1.5 px-3.5 w-full ${prefilled.email ? 'bg-gray-100 text-gray-800 cursor-not-allowed' : 'bg-white'}`}
         ></input>
         <input
           type="text"
+          name="street"
           placeholder="Street"
-          className="border border-gray-300 rounded py-1.5 px-3.5 w-full"
+          value={formData.street}
+          onChange={handleInputChange}
+          disabled={isProfileComplete && !useDifferentAddress && prefilled.street}
+          className={`border border-gray-300 rounded py-1.5 px-3.5 w-full ${(isProfileComplete && !useDifferentAddress && prefilled.street) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
         ></input>
         <div className="flex gap-3">
           <input
             type="text"
+            name="city"
             placeholder="City"
-            className="border border-gray-300 rounded py-1.5 px-3.5 w-full"
+            value={formData.city}
+            onChange={handleInputChange}
+            disabled={isProfileComplete && !useDifferentAddress && prefilled.city}
+            className={`border border-gray-300 rounded py-1.5 px-3.5 w-full ${(isProfileComplete && !useDifferentAddress && prefilled.city) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
           ></input>
           <input
             type="text"
+            name="state"
             placeholder="State"
-            className="border border-gray-300 rounded py-1.5 px-3.5 w-full"
+            value={formData.state}
+            onChange={handleInputChange}
+            disabled={isProfileComplete && !useDifferentAddress && prefilled.state}
+            className={`border border-gray-300 rounded py-1.5 px-3.5 w-full ${(isProfileComplete && !useDifferentAddress && prefilled.state) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
           ></input>
         </div>
         <div className="flex gap-3">
           <input
-            type="number"
+            type="text"
+            name="zipcode"
             placeholder="Zipcode"
-            className="border border-gray-300 rounded py-1.5 px-3.5 w-full"
+            value={formData.zipcode}
+            onChange={handleInputChange}
+            disabled={isProfileComplete && !useDifferentAddress && prefilled.zipcode}
+            className={`border border-gray-300 rounded py-1.5 px-3.5 w-full ${(isProfileComplete && !useDifferentAddress && prefilled.zipcode) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
           ></input>
           <input
             type="text"
+            name="country"
             placeholder="Country"
-            className="border border-gray-300 rounded py-1.5 px-3.5 w-full"
+            value={formData.country}
+            onChange={handleInputChange}
+            disabled={isProfileComplete && !useDifferentAddress && prefilled.country}
+            className={`border border-gray-300 rounded py-1.5 px-3.5 w-full ${(isProfileComplete && !useDifferentAddress && prefilled.country) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
           ></input>
         </div>
         <input
-          type="numebr"
+          type="number"
+          name="phoneNumber"
           placeholder="Phone"
-          className="border border-gray-300 rounded py-1.5 px-3.5 w-full"
+          value={formData.phoneNumber}
+          onChange={handleInputChange}
+          disabled={prefilled.phoneNumber}
+          className={`border border-gray-300 rounded py-1.5 px-3.5 w-full ${prefilled.phoneNumber ? 'bg-gray-100 cursor-not-allowed' : ''}`}
         ></input>
       </div>
       {/* Right Side */}
@@ -78,54 +296,54 @@ const PlaceOrder = () => {
           {/* Payment method selection */}
           <div className="flex gap-3 flex-col lg:flex-row">
             <div
-              className="flex items-center gap-3 border p-2 px-3 cursor-pointer"
-              onClick={() => setMethod("stripe")}
+              className="flex items-center gap-3 border p-2 px-3 cursor-pointer hover:bg-gray-50"
+              onClick={() => setMethod("NetBanking")}
             >
               <p
                 className={`min-w-3.5 h-3.5 border rounded-full ${
-                  method === "stripe" ? "bg-green-400" : ""
+                  method === "NetBanking" ? "bg-green-400" : ""
                 }`}
               ></p>
-              <img
-                src={stripeLogo}
-                alt="stripe_logo"
-                className="h-5 mx-4"
-              />
+              <p className="text-gray-700 text-sm font-medium mx-2">
+                NET BANKING
+              </p>
             </div>
             <div
-              className="flex items-center gap-3 border p-2 px-3 cursor-pointer"
-              onClick={() => setMethod("razorpay")}
+              className="flex items-center gap-3 border p-2 px-3 cursor-pointer hover:bg-gray-50"
+              onClick={() => setMethod("UPI")}
             >
               <p
                 className={`min-w-3.5 h-3.5 border rounded-full ${
-                  method === "razorpay" ? "bg-green-400" : ""
+                  method === "UPI" ? "bg-green-400" : ""
                 }`}
               ></p>
-              <img
-                src={razorpayLogo}
-                alt="razorpay_logo"
-                className="h-5 mx-4"
-              />
+              <p className="text-gray-700 text-sm font-medium mx-2">
+                UPI
+              </p>
             </div>
             <div
-              className="flex items-center gap-3 border p-2 px-3 cursor-pointer"
-              onClick={() => setMethod("cod")}
+              className="flex items-center gap-3 border p-2 px-3 cursor-pointer hover:bg-gray-50"
+              onClick={() => setMethod("CashOnDelivery")}
             >
               <p
                 className={`min-w-3.5 h-3.5 border rounded-full ${
-                  method === "cod" ? "bg-green-400" : ""
+                  method === "CashOnDelivery" ? "bg-green-400" : ""
                 }`}
               >
                 {" "}
               </p>
-              <p className="text-gray-500 text-sm font-medium mx-4">
+              <p className="text-gray-700 text-sm font-medium mx-2">
                 CASH ON DELIVERY
               </p>
             </div>
           </div>
           <div className="w-full text-end mt-8">
-            <button className="bg-black text-white px-16 py-3 text-sm" onClick={()=>navigate('/orders')}>
-              PLACE ORDER
+            <button 
+              className={`text-white px-16 py-3 text-sm ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-black cursor-pointer'}`}
+              onClick={handlePlaceOrder}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "PLACING ORDER..." : "PLACE ORDER"}
             </button>
           </div>
         </div>

@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import PlaceOrder from './pages/PlaceOrder';
 import Product from './pages/Product';
 import Orders from './pages/Orders';
+import Profile from './pages/Profile';
 import NavBar from './components/NavBar';
 import Footer from './components/Footer';
 import SearchBar from './components/SearchBar';
@@ -37,6 +38,7 @@ function App() {
       <Route path='/login' element={<Orders/>}/>
       <Route path='/placeorder' element={<PlaceOrder/>}/>
       <Route path='/orders' element={<Orders/>}/>
+      <Route path='/profile' element={<Profile/>}/>
       <Route path='/product/:productId' element={<Product/>}/>
     </Routes>
     <Footer/>

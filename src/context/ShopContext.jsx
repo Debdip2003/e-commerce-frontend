@@ -4,8 +4,9 @@ import { useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
 import { getProducts, searchProducts } from "../services/productService";
 import api from "../services/axiosInstance";
-import { getUserId } from "../services/userService";
+import { getUserProfile } from "../services/userService";
 import { addCartItem, getCartItems, updateCartItem, deleteCartItem } from "../services/cartService";
+import { placeOrder, getOrders } from "../services/orderService";
 
 export const ShopContext = createContext();
 
@@ -102,7 +103,7 @@ const ShopContextProvider = (props) => {
 
 
   const fetchUserDetails = async () =>{
-    const userId = await getUserId();
+    const userId = await getUserProfile();
     setUserId(userId);
   }
 
@@ -111,14 +112,16 @@ const ShopContextProvider = (props) => {
           setIsSearching(true);
           try {
             const response = await searchProducts(search);
-            const data = response.data;
-            if(data){
-              setProducts(data);
+            // AI search endpoint returns products inside data.products
+            const products = response.data?.products || [];
+            if(products){
+              setProducts(products);
               setIsSearching(false);
             }
           } catch (error) {
-            console.error("Error searching products:", error);
+            toast.error("Search failed. Please try again.");
             setProducts([]);
+            setIsSearching(false);
           }
     }
   };
@@ -129,11 +132,9 @@ const ShopContextProvider = (props) => {
       const data = response.data;
       if(data){
         setProducts(data);
-      } else {
-        console.error("Failed to fetch products");
       }
     }catch(error){
-      console.error(error);
+      // Silent fail for product fetching
     }
   }
 
@@ -161,15 +162,10 @@ const ShopContextProvider = (props) => {
             setCartItems(response.data.cart || {});
             setCartTotal(response.data.total || 0);
             toast.success(response.data.message || "Product is added to cart");
-            // Fetch latest cart details from backend
-            if(userId) {
-              await fetchCartItems(userId);
-            }
           }else{
             toast.error(response.data.message || "Failed to add item to cart");
           }
         } catch (error) {
-          console.error("Error adding to cart:", error);
           toast.error("Failed to add item to cart");
         }
     }
@@ -185,7 +181,6 @@ const ShopContextProvider = (props) => {
           toast.error(response.data.message || "Failed to fetch cart items");
         }
       } catch (error) {
-        console.error("Error fetching cart items:", error);
         toast.error("Failed to fetch cart items");
       }
   }
@@ -215,10 +210,6 @@ const ShopContextProvider = (props) => {
           setCartItems(response.data.cart || {});
           setCartTotal(response.data.total || 0);
           toast.success("Cart updated successfully");
-          // Fetch latest cart details from backend
-          if(userId) {
-            await fetchCartItems(userId);
-          }
         }
       } else {
         // For deletion (quantity = 0), call delete API
@@ -227,14 +218,9 @@ const ShopContextProvider = (props) => {
           setCartItems(response.data.cart || {});
           setCartTotal(response.data.total || 0);
           toast.success(response.data.message || "Item removed from cart");
-          // Fetch latest cart details from backend
-          if(userId) {
-            await fetchCartItems(userId);
-          }
         }
       }
     } catch (error) {
-      console.error("Error updating cart:", error);
       toast.error(error.response?.data?.error || "Failed to update cart");
       // Revert to previous state by refetching cart
       if (userId) {
@@ -243,6 +229,34 @@ const ShopContextProvider = (props) => {
     }
   };
 
+  const submitOrder = async (orderData) => {
+    try {
+      const response = await placeOrder(orderData);
+      if (response.status === 201) {
+        // Clear cart after successful order
+        setCartItems({});
+        setCartTotal(0);
+        toast.success(response.data.message || "Order placed successfully");
+        navigate('/orders');
+        return response.data;
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to place order");
+      throw error;
+    }
+  };
+
+  const fetchUserOrders = async (userId) => {
+    try {
+      const response = await getOrders(userId);
+      if (response.status === 200) {
+        return response.data.orders || [];
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to fetch orders");
+      return [];
+    }
+  };
 
 
   const value = useMemo(() => ({
@@ -260,6 +274,8 @@ const ShopContextProvider = (props) => {
     addToCart,
     getCartCount,
     updateQuantity,
+    submitOrder,
+    fetchUserOrders,
     navigate,
     isAuthenticated,
     setAuthToken,
