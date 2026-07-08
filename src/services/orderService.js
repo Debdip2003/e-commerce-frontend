@@ -4,6 +4,14 @@ export const placeOrder = (orderData) => {
     return api.post('/orders', orderData);
 }
 
+export const requestOrderOtp = (payload) => {
+    return api.post('/orders/request-otp', payload);
+}
+
+export const verifyOrderOtp = (payload) => {
+    return api.post('/orders/verify-otp', payload);
+}
+
 export const getOrders = (userId) => {
     return api.get(`/orders/user/${userId}`);
 }

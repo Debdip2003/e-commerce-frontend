@@ -2,6 +2,7 @@ import React, { useContext, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { ShopContext } from "../context/ShopContext";
+import { AuthContext } from "../context/AuthContext";
 import logo from "../assets/frontend_assets/logo.png"
 import searchIcon from "../assets/frontend_assets/search_icon.png"
 import profileIcon from "../assets/frontend_assets/profile_icon.png"
@@ -11,7 +12,7 @@ import dropdownIcon from "../assets/frontend_assets/dropdown_icon.png"
 import { deleteUserAccount, logoutUser } from "../services/userService";
 
 const NavBar = () => {
-  const { isAuthenticated, setAuthToken } = useContext(ShopContext);
+  const { isAuthenticated, setAuthToken } = useContext(AuthContext);
   const [visible, setVisible] = useState(false);
   const { setShowSearch, getCartCount } = useContext(ShopContext);
   const navigate = useNavigate();

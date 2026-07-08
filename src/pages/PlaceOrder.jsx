@@ -2,16 +2,23 @@ import React, { useContext, useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import Title from "../components/Title";
 import CartTotal from "../components/CartTotal";
+import OtpVerification from "../components/OtpVerification";
 import { ShopContext } from "../context/ShopContext";
 import { getUserProfile, getUserById } from "../services/userService";
 
 const PlaceOrder = () => {
   const [method, setMethod] = useState("CashOnDelivery");
-  const { navigate, submitOrder, cartTotal, delivery_fee, cartItems } = useContext(ShopContext);
+  const { navigate, requestOrderOtp, verifyOrderOtp, cartTotal, delivery_fee, cartItems } = useContext(ShopContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOtpSending, setIsOtpSending] = useState(false);
+  const [isOtpVerifying, setIsOtpVerifying] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isProfileComplete, setIsProfileComplete] = useState(false);
   const [useDifferentAddress, setUseDifferentAddress] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [verificationId, setVerificationId] = useState("");
   
   // Form state
   const [formData, setFormData] = useState({
@@ -122,11 +129,117 @@ const PlaceOrder = () => {
       ...prev,
       [name]: value
     }));
+
+    if (otpRequested && !otpVerified) {
+      setOtpRequested(false);
+      setOtpCode("");
+      setVerificationId("");
+    }
+  };
+
+  const buildOrderData = () => ({
+    firstName: formData.firstName,
+    lastName: formData.lastName,
+    email: formData.email,
+    street: formData.street,
+    city: formData.city,
+    state: formData.state,
+    zipcode: formData.zipcode,
+    country: formData.country,
+    phoneNumber: formData.phoneNumber,
+    cart: cartItems,
+    totalPrice: cartTotal === 0 ? 0 : cartTotal + delivery_fee,
+    paymentMethod: method
+  });
+
+  const hasCartItems = Object.values(cartItems).some((items) => Array.isArray(items) && items.length > 0);
+
+  const getErrorMessage = (error, fallbackMessage) => {
+    return error?.response?.data?.error || fallbackMessage;
+  };
+
+  const resetOtpFlow = () => {
+    setOtpCode("");
+    setOtpRequested(false);
+    setOtpVerified(false);
+    setVerificationId("");
+  };
+
+  const maskEmail = (email) => {
+    const [localPart, domainPart] = email.split("@");
+    if (!domainPart) return email;
+
+    const visibleStart = localPart.slice(0, 2);
+    const visibleEnd = localPart.slice(-1);
+    const maskedLocal = `${visibleStart}${localPart.length > 3 ? "***" : "*"}${visibleEnd}`;
+    return `${maskedLocal}@${domainPart}`;
+  };
+
+  const sendOtp = async () => {
+    if (!formData.email) {
+      toast.error("Email address is required to send the OTP");
+      return;
+    }
+
+    try {
+      setIsOtpSending(true);
+      const orderData = buildOrderData();
+
+      const response = await requestOrderOtp({
+        email: orderData.email,
+        firstName: orderData.firstName,
+        lastName: orderData.lastName,
+        street: orderData.street,
+        city: orderData.city,
+        state: orderData.state,
+        zipcode: orderData.zipcode,
+        country: orderData.country,
+        phoneNumber: orderData.phoneNumber,
+        totalPrice: orderData.totalPrice,
+        paymentMethod: orderData.paymentMethod
+      });
+
+      setVerificationId(response?.verificationId || "");
+      setOtpRequested(true);
+      setOtpVerified(false);
+    } catch (error) {
+      console.error("Error sending OTP:", error);
+      toast.error(getErrorMessage(error, "Failed to send OTP"));
+    } finally {
+      setIsOtpSending(false);
+    }
+  };
+
+  const confirmOtp = async () => {
+    if (!otpCode.trim()) {
+      toast.error("Enter the OTP sent to your email");
+      return;
+    }
+
+    if (!verificationId) {
+      toast.error("Please request a new OTP before verifying");
+      return;
+    }
+
+    try {
+      setIsOtpVerifying(true);
+      await verifyOrderOtp({
+        verificationId,
+        otp: otpCode.trim()
+      });
+
+      setOtpVerified(true);
+      resetOtpFlow();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Invalid OTP"));
+    } finally {
+      setIsOtpVerifying(false);
+    }
   };
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
-    
+
     // Validate all fields
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.street || 
         !formData.city || !formData.state || !formData.zipcode || !formData.country || !formData.phoneNumber) {
@@ -134,29 +247,14 @@ const PlaceOrder = () => {
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      
-      const orderData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        street: formData.street,
-        city: formData.city,
-        state: formData.state,
-        zipcode: formData.zipcode,
-        country: formData.country,
-        phoneNumber: formData.phoneNumber,
-        cart: cartItems,
-        totalPrice: cartTotal === 0 ? 0 : cartTotal + delivery_fee,
-        paymentMethod: method
-      };
+    if (!otpRequested) {
+      await sendOtp();
+      return;
+    }
 
-      await submitOrder(orderData);
-    } catch (error) {
-      toast.error("Failed to place order");
-    } finally {
-      setIsSubmitting(false);
+    if (!otpVerified) {
+      toast.error("Verify the OTP sent to your email before placing the order");
+      return;
     }
   };
 
@@ -191,7 +289,6 @@ const PlaceOrder = () => {
         
         {isProfileComplete && (
           <button
-            type="button"
             onClick={() => setUseDifferentAddress(!useDifferentAddress)}
             className="text-xs text-blue-600 hover:text-blue-800 underline mb-3 text-left"
           >
@@ -339,13 +436,36 @@ const PlaceOrder = () => {
           </div>
           <div className="w-full text-end mt-8">
             <button 
-              className={`text-white px-16 py-3 text-sm ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-black cursor-pointer'}`}
+              className={`text-white px-16 py-3 text-sm ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-black cursor-pointer'} disabled:bg-gray-400`}
               onClick={handlePlaceOrder}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isOtpSending || isOtpVerifying}
             >
-              {isSubmitting ? "PLACING ORDER..." : "PLACE ORDER"}
+              {isSubmitting
+                ? "PLACING ORDER..."
+                : isOtpSending
+                  ? "SENDING OTP..."
+                  : isOtpVerifying
+                    ? "VERIFYING OTP..."
+                    : otpRequested && !otpVerified
+                      ? "VERIFY OTP TO PLACE ORDER"
+                      : "PLACE ORDER"}
             </button>
           </div>
+          <OtpVerification
+            visible={hasCartItems && otpRequested && !otpVerified}
+            recipient={maskEmail(formData.email)}
+            title="Verification Code"
+            description="We sent a verification code to"
+            otpValue={otpCode}
+            onOtpChange={setOtpCode}
+            onVerify={confirmOtp}
+            onResend={sendOtp}
+            isVerifying={isOtpVerifying}
+            isResending={isOtpSending}
+            verifyButtonText="VERIFY OTP"
+            resendButtonText="RESEND OTP"
+            inputPlaceholder="Enter OTP"
+          />
         </div>
       </div>
     </div>

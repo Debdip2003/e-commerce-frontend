@@ -1,12 +1,12 @@
-import { createContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
 import { getProducts, searchProducts } from "../services/productService";
-import api from "../services/axiosInstance";
 import { getUserProfile } from "../services/userService";
 import { addCartItem, getCartItems, updateCartItem, deleteCartItem } from "../services/cartService";
-import { placeOrder, getOrders } from "../services/orderService";
+import { requestOrderOtp as requestOrderOtpApi, verifyOrderOtp as verifyOrderOtpApi, getOrders } from "../services/orderService";
+import { AuthContext } from "./AuthContext";
 
 export const ShopContext = createContext();
 
@@ -19,12 +19,10 @@ const ShopContextProvider = (props) => {
   const [products, setProducts] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [filters, setFilters] = useState({});
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    Boolean(localStorage.getItem("access-token"))
-  );
   const [userId, setUserId] = useState("");
   const [cartTotal, setCartTotal] = useState(0);
   const navigate=useNavigate()
+  const { isAuthenticated } = useContext(AuthContext);
 
   useEffect(()=>{
     const timer = setTimeout(()=>{
@@ -53,46 +51,6 @@ const ShopContextProvider = (props) => {
       fetchUserDetails();
     }
   }, [isAuthenticated])
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const restoreSession = async () => {
-      const accessToken = localStorage.getItem("access-token");
-      const refreshToken = localStorage.getItem("refresh-token");
-
-      if (accessToken || !refreshToken) return;
-
-      try {
-        const response = await api.post("/user/refresh-token", { refreshToken });
-        const newAccessToken = response?.data?.accessToken || response?.data?.token;
-
-        if (!newAccessToken) {
-          throw new Error("No access token returned from refresh endpoint");
-        }
-
-        if (!cancelled) {
-          setAuthToken(newAccessToken, refreshToken);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setAuthToken(null);
-        }
-      }
-    };
-
-    restoreSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const syncAuth = () => setIsAuthenticated(Boolean(localStorage.getItem("access-token")));
-    window.addEventListener("storage", syncAuth); // cross-tab sync
-    return () => window.removeEventListener("storage", syncAuth);
-  }, []);
 
   useEffect(()=>{
     if(userId){
@@ -137,18 +95,6 @@ const ShopContextProvider = (props) => {
       // Silent fail for product fetching
     }
   }
-
-  const setAuthToken = (accessToken, refreshToken = "") => {
-    if (accessToken) {
-      localStorage.setItem("access-token", accessToken);
-      if (refreshToken) localStorage.setItem("refresh-token", refreshToken);
-      setIsAuthenticated(true);
-    } else {
-      localStorage.removeItem("access-token");
-      localStorage.removeItem("refresh-token");
-      setIsAuthenticated(false);
-    }
-  };
 
   const addToCart = async (itemId, size) => {
     if (!size) {
@@ -229,23 +175,6 @@ const ShopContextProvider = (props) => {
     }
   };
 
-  const submitOrder = async (orderData) => {
-    try {
-      const response = await placeOrder(orderData);
-      if (response.status === 201) {
-        // Clear cart after successful order
-        setCartItems({});
-        setCartTotal(0);
-        toast.success(response.data.message || "Order placed successfully");
-        navigate('/orders');
-        return response.data;
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.error || "Failed to place order");
-      throw error;
-    }
-  };
-
   const fetchUserOrders = async (userId) => {
     try {
       const response = await getOrders(userId);
@@ -255,6 +184,61 @@ const ShopContextProvider = (props) => {
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to fetch orders");
       return [];
+    }
+  };
+
+  const requestOrderOtp = async (orderData) => {
+    if (!isAuthenticated) {
+      toast.error("Please login before placing an order");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const otpPayload = {
+        firstName: orderData.firstName,
+        lastName: orderData.lastName,
+        email: orderData.email,
+        street: orderData.street,
+        city: orderData.city,
+        state: orderData.state,
+        zipcode: orderData.zipcode,
+        country: orderData.country,
+        phoneNumber: orderData.phoneNumber,
+        totalPrice: orderData.totalPrice,
+        paymentMethod: orderData.paymentMethod,
+      };
+
+      const response = await requestOrderOtpApi(otpPayload);
+      if (response.status === 200) {
+        toast.success(response.data.message || "OTP sent successfully");
+        return response.data;
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to request OTP");
+      throw error;
+    }
+  };
+
+  const verifyOrderOtp = async ({ verificationId, otp }) => {
+    if (!isAuthenticated) {
+      toast.error("Please login before placing an order");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const response = await verifyOrderOtpApi({ verificationId, otp });
+      if (response.status === 201) {
+        setCartItems({});
+        setCartTotal(0);
+        toast.success(response.data.message || "Order placed successfully");
+        navigate('/orders');
+        return response.data;
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to verify OTP");
+      throw error;
     }
   };
 
@@ -274,11 +258,10 @@ const ShopContextProvider = (props) => {
     addToCart,
     getCartCount,
     updateQuantity,
-    submitOrder,
+    requestOrderOtp,
+    verifyOrderOtp,
     fetchUserOrders,
     navigate,
-    isAuthenticated,
-    setAuthToken,
     userId,
     cartTotal,
   }), [
